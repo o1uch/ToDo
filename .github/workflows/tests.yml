@@ -5,18 +5,18 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: [1.24.x]
-  
+    strategy: 
+      fail-fast: false # если хотя бы один job из матрицы упадёт → все остальные сразу отменяются.
+      matrix: # 
+        go-version: [1.24.x] # 
+
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v4 
 
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24.x'
+        go-version: '1.24.x' # 
         
     - name: Display Go version
       run: go version
@@ -24,10 +24,8 @@ jobs:
     - name: Install dependencies
       run: go mod tidy
 
-    - name: Run local server
+    - name: Run local server # 
       run: |
         CGO_ENABLED=0 GOOS=linux go run main.go &
         sleep 100
         go test -run ^TestApp$ ./tests
-        
-        
