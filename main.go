@@ -12,11 +12,11 @@ func main() {
 
 	// тест правила "y"
 
-	now := time.Date(2025, 11, 24, 11, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 02, 04, 11, 0, 0, 0, time.UTC)
 
-	dstart := "20250101"
+	dstart := "20260129"
 
-	repeatValue := "y"
+	repeatValue := "w "
 
 	nextDate, err := repeat.NextDate(now, dstart, repeatValue)
 
