@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const layout = "20060102"
+const DateLayout = "20060102"
 
 var (
 	RepeatIsEmpty     = errors.New("the \"repeat\" field is not set")
@@ -262,7 +262,7 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 		return "", err
 	}
 
-	dsTime, err := time.Parse(layout, dstart)
+	dsTime, err := time.Parse(DateLayout, dstart)
 
 	if err != nil {
 		return "", DStartIsIncorrect
@@ -270,14 +270,15 @@ func NextDate(now time.Time, dstart string, repeat string) (string, error) {
 
 	nextDate = dsTime
 
-	for {
-		if nextDate.After(now) {
-			break
-		}
+	if nextDate.After(now) {
 		nextDate = validRepeat.Next(nextDate)
+	} else {
+		for !nextDate.After(now) {
+			nextDate = validRepeat.Next(nextDate)
+		}
 	}
 
-	strNexDate := nextDate.Format(layout)
+	strNexDate := nextDate.Format(DateLayout)
 
 	return strNexDate, nil
 }

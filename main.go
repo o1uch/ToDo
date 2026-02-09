@@ -2,68 +2,82 @@ package main
 
 import (
 	"fmt"
-	"time"
+	"net/http"
 
-	"github.com/o1uch/go_final_project/internal/repeat"
+	"github.com/o1uch/go_final_project/internal/api"
+	"github.com/o1uch/go_final_project/internal/config"
 	_ "modernc.org/sqlite"
 )
 
 func main() {
+	webDir := "./web"
+	port, _ := config.GetPort()
 
-	// тест правила "y"
+	api.Init()
+	http.Handle("/", http.FileServer(http.Dir(webDir)))
 
-	now := time.Date(2026, 02, 04, 11, 0, 0, 0, time.UTC)
-
-	dstart := "20260129"
-
-	repeatValue := "w "
-
-	nextDate, err := repeat.NextDate(now, dstart, repeatValue)
+	err := http.ListenAndServe(port, nil)
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	fmt.Println(nextDate)
-
 	/*
 
-	   // реализация шага 2. Создание БД.
+		   // реализация шага 2. Создание БД.
 
-	   	dbPath, err := config.GetDBPath()
+		   	dbPath, err := config.GetDBPath()
 
-	   	if err != nil {
-	   		fmt.Println(err)
-	   		return
-	   	}
+		   	if err != nil {
+		   		fmt.Println(err)
+		   		return
+		   	}
 
-	   	db, err := db.Init(dbPath)
+		   	db, err := db.Init(dbPath)
 
-	   	if err != nil {
-	   		fmt.Println(err)
-	   		return
-	   	}
+		   	if err != nil {
+		   		fmt.Println(err)
+		   		return
+		   	}
 
-	   	if err := db.Ping(); err != nil {
-	   		fmt.Println(err)
-	   		return
-	   	} else {
-	   		fmt.Println("connection successfuly")
-	   	}
+		   	if err := db.Ping(); err != nil {
+		   		fmt.Println(err)
+		   		return
+		   	} else {
+		   		fmt.Println("connection successfuly")
+		   	}
 
-	   	// шаг 1
-	   	webDir := "./web"
-	   	port, _ := config.GetPort()
+		   	// шаг 1
+		   	webDir := "./web"
+		   	port, _ := config.GetPort()
 
-	   	http.Handle("/", http.FileServer(http.Dir(webDir)))
+		   	http.Handle("/", http.FileServer(http.Dir(webDir)))
 
-	   	err = http.ListenAndServe(port, nil)
+		   	err = http.ListenAndServe(port, nil)
 
-	   	if err != nil {
-	   		fmt.Println(err)
-	   		return
-	   	}
+		   	if err != nil {
+		   		fmt.Println(err)
+		   		return
+		   	}
+
+
+
+			-- NextDate tests
+
+		now := time.Date(2024, 01, 26, 00, 0, 0, 0, time.UTC)
+
+		dstart := "20240116"
+
+		repeatValue := "m -1,18"
+
+		nextDate, err := repeat.NextDate(now, dstart, repeatValue)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Println(nextDate)
 
 	*/
 }
