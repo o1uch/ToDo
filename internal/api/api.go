@@ -16,17 +16,40 @@ type API struct {
 	store *store.SchedulerStore
 }
 
+// initialization
+
 func Init(store *store.SchedulerStore) {
 	api := API{store: store}
-	http.HandleFunc("/api/nextdate", api.nextDayHandler)
+	http.HandleFunc("/api/nextdate", api.NextDayHandler)
 	http.HandleFunc("/api/task", api.MainTaskHandler)
+	http.HandleFunc("/api/tasks", api.GetTasksHandler)
 }
 
-func (api *API) nextDayHandler(w http.ResponseWriter, r *http.Request) {
+// main task handler
+
+func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		api.addTaskHandler(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeJSON(w, map[string]string{
+			"error": "The post method should be used to create a task",
+		})
+		return
+	}
+}
+
+// next day handler
+
+func (api *API) NextDayHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
 		err := fmt.Sprintf("method %s, is not allowed", r.Method)
-		http.Error(w, err, http.StatusMethodNotAllowed)
+		writeJSON(w, map[string]string{
+			"error": err,
+		})
 		return
 	}
 
@@ -38,7 +61,10 @@ func (api *API) nextDayHandler(w http.ResponseWriter, r *http.Request) {
 		now, err = time.Parse(repeat.DateLayout, nowStr)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSON(w, map[string]string{
+				"error": err.Error(),
+			})
 			return
 		}
 
@@ -48,7 +74,10 @@ func (api *API) nextDayHandler(w http.ResponseWriter, r *http.Request) {
 
 	if dstart == "" {
 		err := "the \"date\" parameter is not specified"
-		http.Error(w, err, http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": err,
+		})
 		return
 	}
 
@@ -57,7 +86,10 @@ func (api *API) nextDayHandler(w http.ResponseWriter, r *http.Request) {
 	nextDate, err := repeat.NextDate(now, dstart, repeatValue)
 
 	if err != nil {
-		http.Error(w, "Error in calculating the nextDate: "+err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "error in calculating the nextDate: " + err.Error(),
+		})
 		return
 	}
 
@@ -65,21 +97,24 @@ func (api *API) nextDayHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		api.addTaskHandler(w, r)
-	default:
-		http.Error(w, "The post method should be used to create a task", http.StatusMethodNotAllowed)
-		return
-	}
-}
-
 func trimExtraSpaces(t *store.Task) {
 	t.Title = strings.TrimSpace(t.Title)
 	t.Comment = strings.TrimSpace(t.Comment)
 	t.Date = strings.TrimSpace(t.Date)
+	t.Repeat = strings.TrimSpace(t.Repeat)
 }
+
+func writeJSON(w http.ResponseWriter, data any) {
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+// add task handler
 
 func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -87,26 +122,37 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
+
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
 		return
 	}
 
 	err = json.Unmarshal(body, &newTask)
 
 	if err != nil {
-		http.Error(w, "Invalid JOSN: "+err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "invalid JSON: " + err.Error(),
+		})
 		return
 	}
 
 	trimExtraSpaces(&newTask)
 
 	if newTask.Title == "" {
-		http.Error(w, "error: "+"the issue title is not specified", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "the title field is empty",
+		})
 		return
 	}
 
-	now := time.Now()
+	t := time.Now()
+	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 	nowStr := now.Format("20060102")
 
 	if newTask.Date == "" {
@@ -116,7 +162,10 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	date, err := time.Parse("20060102", newTask.Date)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
 		return
 	}
 
@@ -128,7 +177,10 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 			nextDate, err := repeat.NextDate(now, newTask.Date, newTask.Repeat)
 
 			if err != nil {
-				http.Error(w, "error: "+err.Error(), http.StatusBadRequest)
+				w.WriteHeader(http.StatusBadRequest)
+				writeJSON(w, map[string]string{
+					"error": err.Error(),
+				})
 				return
 			}
 			newTask.Date = nextDate
@@ -139,12 +191,29 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	lastID, err := api.store.AddTask(&newTask)
 
 	if err != nil {
-		http.Error(w, "error: "+err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
 	}
 
-	resp := fmt.Sprintf("\"id\":\"%d\"", lastID)
+	writeJSON(w, map[string]int64{
+		"id": lastID,
+	})
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.Write([]byte(resp))
+}
+
+// get tasks handler
+
+func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeJSON(w, map[string]string{
+			"error": "the method used is not supported",
+		})
+		return
+	}
 
 }

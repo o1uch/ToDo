@@ -50,3 +50,35 @@ func (s *SchedulerStore) AddTask(task *Task) (int64, error) {
 	return id, nil
 
 }
+
+func (s *SchedulerStore) GetTasks(limit int) ([]Task, error) {
+
+	rows, err := s.db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date LIMIT :limit;", sql.Named("limit", limit))
+
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]Task, 0, 16)
+
+	defer rows.Close()
+	for rows.Next() {
+		t := Task{}
+		if err := rows.Scan(&t.ID,
+			&t.Date,
+			&t.Title,
+			&t.Comment,
+			&t.Repeat,
+		); err != nil {
+			return nil, err
+		}
+
+		tasks = append(tasks, t)
+	}
+
+	if err := rows.Err(); err != nil { // для чего нужен row.Err() и когда его правильней вызывать, во время row.Next() или после?
+		return nil, err
+	}
+
+	return tasks, nil
+}
