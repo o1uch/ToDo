@@ -12,8 +12,16 @@ import (
 	"github.com/o1uch/go_final_project/internal/store"
 )
 
+const (
+	defaultTaskLimit = 30
+)
+
 type API struct {
 	store *store.SchedulerStore
+}
+
+type TasksResp struct {
+	Tasks []*store.Task `json:"tasks"`
 }
 
 // initialization
@@ -215,5 +223,59 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	searchPattern := r.URL.Query().Get("search")
+	if searchPattern != "" {
+		filter := store.TaskFilter{}
+		date, err := time.Parse("02.01.2006", searchPattern)
+
+		if err != nil {
+			filter.ByText = true
+			Resp, err := api.store.FindTask(defaultTaskLimit, searchPattern, filter)
+
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				writeJSON(w, map[string]string{
+					"error": err.Error(),
+				})
+				return
+			}
+
+			writeJSON(w, TasksResp{Tasks: Resp})
+			return
+		}
+
+		filter.ByDate = true
+		strDate := date.Format(repeat.DateLayout)
+		Resp, err := api.store.FindTask(defaultTaskLimit, strDate, filter)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		writeJSON(w, TasksResp{Tasks: Resp})
+		return
+
+	}
+
+	Resp, err := api.store.GetTasks(defaultTaskLimit)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if Resp == nil {
+		Resp = []*store.Task{}
+	}
+
+	writeJSON(w, TasksResp{Tasks: Resp})
 
 }

@@ -33,12 +33,18 @@ func main() {
 		fmt.Println("connection successfuly")
 	}
 
-	store := store.NewSchedulerStore(db)
+	storedb := store.NewSchedulerStore(db)
+
+	//test
+	pattern := store.TaskFilter{ByText: true}
+	res, err := storedb.FindTask(30, "не", pattern)
+	fmt.Println(res)
+	//test
 
 	webDir := "./web"
 	port, _ := config.GetPort()
 
-	api.Init(&store)
+	api.Init(&storedb)
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
 
 	err = http.ListenAndServe(port, nil)
