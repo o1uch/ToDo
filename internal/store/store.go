@@ -1,10 +1,9 @@
 package store
 
-// store это CRUD
-
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	_ "modernc.org/sqlite"
 )
@@ -93,8 +92,6 @@ func (s *SchedulerStore) FindTask(limit int, pattern string, f TaskFilter) ([]*T
 
 	switch {
 	case f.ByDate:
-		// считаем, что дата пришла в формате поля scheduler.date
-		// можно сравнивать значения scheduler.date как строки. Лексикографически значения scheduler.date подходят для сравнения
 		rows, err = s.db.Query(`
 		SELECT id, date, title, comment, repeat 
 		FROM scheduler 
@@ -142,4 +139,70 @@ func (s *SchedulerStore) FindTask(limit int, pattern string, f TaskFilter) ([]*T
 	}
 
 	return tasks, nil
+}
+
+func (s *SchedulerStore) GetTaskByID(id string) (*Task, error) {
+	t := Task{}
+	row := s.db.QueryRow(`SELECT id, date, title, comment, repeat FROM scheduler WHERE id = :id;`, sql.Named("id", id))
+
+	if err := row.Scan(&t.ID, &t.Date, &t.Title, &t.Comment, &t.Repeat); err != nil {
+		return nil, err
+	}
+
+	return &t, nil
+}
+
+func (s *SchedulerStore) UpdateTaskByID(task *Task) error {
+	res, err := s.db.Exec(`UPDATE scheduler 
+	SET date = :date,
+	title = :title,
+	comment = :comment,
+	repeat = :repeat 
+	WHERE id = :id;`,
+		sql.Named("date", task.Date),
+		sql.Named("title", task.Title),
+		sql.Named("comment", task.Comment),
+		sql.Named("repeat", task.Repeat),
+		sql.Named("id", task.ID))
+
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf(`incorrect id for updating task`)
+	}
+	return nil
+
+}
+
+func (s *SchedulerStore) DeleteTaskByID(id string) error {
+
+	res, err := s.db.Exec(`
+	DELETE FROM scheduler
+	WHERE id = :id
+	`, sql.Named("id", id))
+
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf("task with id = %v was not found", id)
+	}
+
+	return nil
+
 }

@@ -1,11 +1,11 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/o1uch/go_final_project/internal/repeat"
@@ -24,21 +24,26 @@ type TasksResp struct {
 	Tasks []*store.Task `json:"tasks"`
 }
 
-// initialization
-
 func Init(store *store.SchedulerStore) {
 	api := API{store: store}
-	http.HandleFunc("/api/nextdate", api.NextDayHandler)
-	http.HandleFunc("/api/task", api.MainTaskHandler)
-	http.HandleFunc("/api/tasks", api.GetTasksHandler)
-}
+	http.HandleFunc("/api/signin", api.SignInHandler)
 
-// main task handler
+	http.HandleFunc("/api/nextdate", auth(api.NextDayHandler))
+	http.HandleFunc("/api/task", auth(api.MainTaskHandler))
+	http.HandleFunc("/api/tasks", auth(api.GetTasksHandler))
+	http.HandleFunc("/api/task/done", auth(api.DoneTaskHandler))
+}
 
 func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		api.addTaskHandler(w, r)
+	case http.MethodGet:
+		api.GetTaskByID(w, r)
+	case http.MethodPut:
+		api.ChangeTaskByID(w, r)
+	case http.MethodDelete:
+		api.DeleteTaskByID(w, r)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		writeJSON(w, map[string]string{
@@ -47,8 +52,6 @@ func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
-// next day handler
 
 func (api *API) NextDayHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -105,31 +108,12 @@ func (api *API) NextDayHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func trimExtraSpaces(t *store.Task) {
-	t.Title = strings.TrimSpace(t.Title)
-	t.Comment = strings.TrimSpace(t.Comment)
-	t.Date = strings.TrimSpace(t.Date)
-	t.Repeat = strings.TrimSpace(t.Repeat)
-}
-
-func writeJSON(w http.ResponseWriter, data any) {
-
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-}
-
-// add task handler
-
 func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	newTask := store.Task{}
 
-	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -154,7 +138,7 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if newTask.Title == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		writeJSON(w, map[string]string{
-			"error": "the title field is empty",
+			"error": "the \"title\" field is empty",
 		})
 		return
 	}
@@ -211,8 +195,6 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 }
-
-// get tasks handler
 
 func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -278,4 +260,241 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, TasksResp{Tasks: Resp})
 
+}
+
+func (api *API) GetTaskByID(w http.ResponseWriter, r *http.Request) {
+
+	id := r.URL.Query().Get("id")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "the \"id\" field is empty",
+		})
+		return
+	}
+
+	task, err := api.store.GetTaskByID(id)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNotFound)
+			writeJSON(w, map[string]string{
+				"error": "task not found",
+			})
+			return
+
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{
+				"error": err.Error(),
+			})
+			return
+		}
+	}
+	writeJSON(w, task)
+}
+
+func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
+
+	changeTask := store.Task{}
+
+	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err = json.Unmarshal(body, &changeTask)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "invalid JSON: " + err.Error(),
+		})
+		return
+	}
+
+	trimExtraSpaces(&changeTask)
+
+	if changeTask.ID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "the \"id\" field is empty",
+		})
+		return
+	}
+
+	if changeTask.Title == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "the \"title\" field is empty",
+		})
+		return
+	}
+
+	t := time.Now()
+	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	nowStr := now.Format("20060102")
+
+	if changeTask.Date == "" {
+		changeTask.Date = nowStr
+	}
+
+	date, err := time.Parse("20060102", changeTask.Date)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if date.Before(now) {
+
+		if changeTask.Repeat == "" {
+			changeTask.Date = nowStr
+		} else {
+			nextDate, err := repeat.NextDate(now, changeTask.Date, changeTask.Repeat)
+
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				writeJSON(w, map[string]string{
+					"error": err.Error(),
+				})
+				return
+			}
+			changeTask.Date = nextDate
+		}
+
+	}
+
+	err = api.store.UpdateTaskByID(&changeTask)
+
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, map[string]any{})
+
+}
+
+func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		err := fmt.Sprintf("method %s, is not allowed", r.Method)
+		writeJSON(w, map[string]string{
+			"error": err,
+		})
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "Id is not set",
+		})
+		return
+	}
+
+	task, err := api.store.GetTaskByID(id)
+
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if task.Repeat == "" {
+		err := api.store.DeleteTaskByID(task.ID)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		writeJSON(w, map[string]any{})
+		return
+	}
+
+	t := time.Now()
+
+	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+
+	nextDate, err := repeat.NextDate(now, task.Date, task.Repeat)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	task.Date = nextDate
+
+	err = api.store.UpdateTaskByID(task)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, map[string]any{})
+
+}
+
+func (api *API) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		err := fmt.Sprintf("method %s, is not allowed", r.Method)
+		writeJSON(w, map[string]string{
+			"error": err,
+		})
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "Id is not set",
+		})
+		return
+	}
+
+	err := api.store.DeleteTaskByID(id)
+
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, map[string]any{})
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/o1uch/go_final_project/internal/api"
@@ -13,102 +13,28 @@ import (
 
 func main() {
 	dbPath, err := config.GetDBPath()
-
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatalf("cannot get db path: %v", err)
 	}
 
-	db, err := db.Init(dbPath)
-
+	sqlDB, err := db.Init(dbPath)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatalf("db init failed: %v", err)
 	}
+	defer sqlDB.Close()
 
-	if err := db.Ping(); err != nil {
-		fmt.Println(err)
-		return
-	} else {
-		fmt.Println("connection successfuly")
-	}
+	store := store.NewSchedulerStore(sqlDB)
 
-	storedb := store.NewSchedulerStore(db)
-
-	//test
-	pattern := store.TaskFilter{ByText: true}
-	res, err := storedb.FindTask(30, "не", pattern)
-	fmt.Println(res)
-	//test
-
-	webDir := "./web"
-	port, _ := config.GetPort()
-
-	api.Init(&storedb)
-	http.Handle("/", http.FileServer(http.Dir(webDir)))
-
-	err = http.ListenAndServe(port, nil)
-
+	port, err := config.GetPort()
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Printf("port warning: %v, using default", err)
 	}
-	/*
 
-		   // реализация шага 2. Создание БД.
+	api.Init(&store)
+	http.Handle("/", http.FileServer(http.Dir("./web")))
 
-		   	dbPath, err := config.GetDBPath()
-
-		   	if err != nil {
-		   		fmt.Println(err)
-		   		return
-		   	}
-
-		   	db, err := db.Init(dbPath)
-
-		   	if err != nil {
-		   		fmt.Println(err)
-		   		return
-		   	}
-
-		   	if err := db.Ping(); err != nil {
-		   		fmt.Println(err)
-		   		return
-		   	} else {
-		   		fmt.Println("connection successfuly")
-		   	}
-
-		   	// шаг 1
-		   	webDir := "./web"
-		   	port, _ := config.GetPort()
-
-		   	http.Handle("/", http.FileServer(http.Dir(webDir)))
-
-		   	err = http.ListenAndServe(port, nil)
-
-		   	if err != nil {
-		   		fmt.Println(err)
-		   		return
-		   	}
-
-
-
-			-- NextDate tests
-
-		now := time.Date(2024, 01, 26, 00, 0, 0, 0, time.UTC)
-
-		dstart := "20240116"
-
-		repeatValue := "m -1,18"
-
-		nextDate, err := repeat.NextDate(now, dstart, repeatValue)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		fmt.Println(nextDate)
-
-	*/
+	log.Printf("Server starting on %s", port)
+	if err := http.ListenAndServe(port, nil); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
 }
