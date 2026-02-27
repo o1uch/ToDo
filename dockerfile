@@ -10,7 +10,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o scheduler ./main.go
 
-FROM ubuntu:latest
+FROM alpine:latest
 
 WORKDIR /app
 
@@ -24,5 +24,3 @@ ENV TODO_PASSWORD=12345
 EXPOSE ${TODO_PORT}
 
 CMD ["./scheduler"]
-
-# команда для запуска контейнера: docker run -d --name scheduler-container -p 7540:7540 -v "C:\path\to\db\scheduler.db:/data/scheduler.db" -e TODO_PASSWORD=12345 my-scheduler

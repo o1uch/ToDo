@@ -152,7 +152,7 @@ func (s *SchedulerStore) GetTaskByID(id string) (*Task, error) {
 	return &t, nil
 }
 
-func (s *SchedulerStore) UpdateTaskByID(task *Task) error {
+func (s *SchedulerStore) Update(task *Task) error {
 	res, err := s.db.Exec(`UPDATE scheduler 
 	SET date = :date,
 	title = :title,
@@ -182,7 +182,7 @@ func (s *SchedulerStore) UpdateTaskByID(task *Task) error {
 
 }
 
-func (s *SchedulerStore) DeleteTaskByID(id string) error {
+func (s *SchedulerStore) Delete(id string) error {
 
 	res, err := s.db.Exec(`
 	DELETE FROM scheduler

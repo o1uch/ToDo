@@ -17,7 +17,8 @@ const (
 )
 
 type API struct {
-	store *store.SchedulerStore
+	store     *store.SchedulerStore
+	authToken string
 }
 
 type TasksResp struct {
@@ -25,13 +26,14 @@ type TasksResp struct {
 }
 
 func Init(store *store.SchedulerStore) {
-	api := API{store: store}
+	api := &API{store: store}
+	api.initAuthToken()
 	http.HandleFunc("/api/signin", api.SignInHandler)
 
-	http.HandleFunc("/api/nextdate", auth(api.NextDayHandler))
-	http.HandleFunc("/api/task", auth(api.MainTaskHandler))
-	http.HandleFunc("/api/tasks", auth(api.GetTasksHandler))
-	http.HandleFunc("/api/task/done", auth(api.DoneTaskHandler))
+	http.HandleFunc("/api/nextdate", api.NextDayHandler)
+	http.HandleFunc("/api/task", api.auth(api.MainTaskHandler))
+	http.HandleFunc("/api/tasks", api.auth(api.GetTasksHandler))
+	http.HandleFunc("/api/task/done", api.auth(api.DoneTaskHandler))
 }
 
 func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +114,6 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	newTask := store.Task{}
 
-	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -299,7 +300,6 @@ func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
 
 	changeTask := store.Task{}
 
-	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -375,7 +375,7 @@ func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	err = api.store.UpdateTaskByID(&changeTask)
+	err = api.store.Update(&changeTask)
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -421,7 +421,7 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if task.Repeat == "" {
-		err := api.store.DeleteTaskByID(task.ID)
+		err := api.store.Delete(task.ID)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -451,7 +451,7 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	task.Date = nextDate
 
-	err = api.store.UpdateTaskByID(task)
+	err = api.store.Update(task)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -486,7 +486,7 @@ func (api *API) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := api.store.DeleteTaskByID(id)
+	err := api.store.Delete(id)
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
