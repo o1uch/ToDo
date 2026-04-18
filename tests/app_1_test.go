@@ -21,6 +21,8 @@ func getURL(path string) string {
 			port = int(eport)
 		}
 	}
+	// `\` - виндовые, в строке из переменной path заменяются на линуксовые `/`
+	// из строки обрезается, если есть префикс `../web/`
 	path = strings.TrimPrefix(strings.ReplaceAll(path, `\`, `/`), `../web/`)
 	return fmt.Sprintf("http://localhost:%d/%s", port, path)
 }

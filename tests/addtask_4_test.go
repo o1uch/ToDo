@@ -20,20 +20,23 @@ func requestJSON(apipath string, values map[string]any, method string) ([]byte, 
 		err  error
 	)
 
-	if len(values) > 0 {
-		data, err = json.Marshal(values)
+	if len(values) > 0 { // проверяется наличие полезной нагрузки
+		data, err = json.Marshal(values) // при её наличии вся хэш-таблица маршится в []byte
 		if err != nil {
 			return nil, err
 		}
 	}
-	var resp *http.Response
+	var resp *http.Response // создаётся *http.Response для того, чтобы ниже записать ответ запроса
 
+	// регистрируется request
 	req, err := http.NewRequest(method, getURL(apipath), bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
+	// устанавливается заголовок ("Content-Type", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
+	// инициализируется client
 	client := &http.Client{}
 	if len(Token) > 0 {
 		jar, err := cookiejar.New(nil)
@@ -54,6 +57,7 @@ func requestJSON(apipath string, values map[string]any, method string) ([]byte, 
 		return nil, err
 	}
 
+	// если тело ответа не nil - читаем и закрываем.
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
