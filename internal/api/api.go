@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/o1uch/go_final_project/internal/repeat"
@@ -181,7 +182,7 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	lastID, err := api.store.AddTask(&newTask)
+	lastID, err := api.store.Create(&newTask)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -207,14 +208,15 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filter := store.TaskFilter{}
 	searchPattern := r.URL.Query().Get("search")
 	if searchPattern != "" {
-		filter := store.TaskFilter{}
+		filter.Value = searchPattern
 		date, err := time.Parse("02.01.2006", searchPattern)
 
 		if err != nil {
-			filter.ByText = true
-			Resp, err := api.store.FindTask(defaultTaskLimit, searchPattern, filter)
+			filter.Type = store.FilterByText
+			Resp, err := api.store.GetList(filter)
 
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -228,9 +230,10 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		filter.ByDate = true
+		filter.Type = store.FilterByDate
 		strDate := date.Format(repeat.DateLayout)
-		Resp, err := api.store.FindTask(defaultTaskLimit, strDate, filter)
+		filter.Value = strDate
+		Resp, err := api.store.GetList(filter)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -245,7 +248,10 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	Resp, err := api.store.GetTasks(defaultTaskLimit)
+	filter.Type = store.FilterByLimit
+	strLimit := strconv.Itoa(defaultTaskLimit)
+	filter.Value = strLimit
+	Resp, err := api.store.GetList(filter)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -265,9 +271,9 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 func (api *API) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 
-	id := r.URL.Query().Get("id")
+	idStr := r.URL.Query().Get("id")
 
-	if id == "" {
+	if idStr == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		writeJSON(w, map[string]string{
 			"error": "the \"id\" field is empty",
@@ -275,7 +281,16 @@ func (api *API) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := api.store.GetTaskByID(id)
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "invalid ID",
+		})
+		return
+	}
+
+	task, err := api.store.GetByID(id)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -322,7 +337,7 @@ func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
 
 	trimExtraSpaces(&changeTask)
 
-	if changeTask.ID == "" {
+	if changeTask.ID == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		writeJSON(w, map[string]string{
 			"error": "the \"id\" field is empty",
@@ -400,9 +415,9 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.URL.Query().Get("id")
+	idStr := r.URL.Query().Get("id")
 
-	if id == "" {
+	if idStr == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		writeJSON(w, map[string]string{
 			"error": "Id is not set",
@@ -410,7 +425,16 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := api.store.GetTaskByID(id)
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "invalid ID",
+		})
+		return
+	}
+
+	task, err := api.store.GetByID(id)
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -476,9 +500,9 @@ func (api *API) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.URL.Query().Get("id")
+	idStr := r.URL.Query().Get("id")
 
-	if id == "" {
+	if idStr == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		writeJSON(w, map[string]string{
 			"error": "Id is not set",
@@ -486,7 +510,16 @@ func (api *API) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := api.store.Delete(id)
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{
+			"error": "invalid ID",
+		})
+		return
+	}
+
+	err = api.store.Delete(id)
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
