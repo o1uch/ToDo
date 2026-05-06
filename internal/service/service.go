@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -9,13 +10,18 @@ import (
 	"github.com/o1uch/go_final_project/internal/store"
 )
 
+const (
+	defaultTaskLimit = 30
+)
+
 var (
-	ErrEmptyTitle = errors.New("title is required")
-	ErrDateParse  = errors.New("error parsing a string into a date")
-	ErrEmptyDate  = errors.New("date is required")
-	ErrInvalidNow = errors.New("invalid now format")
-	ErrNextDate   = errors.New("error calculating the nextDate function")
-	ErrCreateTask = errors.New("task creation error")
+	ErrEmptyTitle   = errors.New("title is required")
+	ErrDateParse    = errors.New("error parsing a string into a date")
+	ErrEmptyDate    = errors.New("date is required")
+	ErrInvalidNow   = errors.New("invalid now format")
+	ErrNextDate     = errors.New("error calculating the nextDate function")
+	ErrCreateTask   = errors.New("task creation error")
+	ErrGettingTasks = errors.New("error getting task list")
 )
 
 type Service struct {
@@ -100,4 +106,36 @@ func (s *Service) AddTask(task *store.Task) (int64, error) {
 	}
 
 	return id, nil
+}
+
+func (s *Service) GetTasks(searchPattern string) ([]*store.Task, error) {
+
+	filter := store.TaskFilter{}
+
+	if searchPattern != "" {
+		date, err := time.Parse("02.01.2006", searchPattern)
+		if err != nil {
+			filter.Type = store.FilterByText
+			filter.Value = searchPattern
+		} else {
+			filter.Type = store.FilterByDate
+			strDate := date.Format(repeat.DateLayout)
+			filter.Value = strDate
+		}
+	} else {
+		filter.Type = store.FilterByLimit
+		strLimit := strconv.Itoa(defaultTaskLimit)
+		filter.Value = strLimit
+	}
+
+	tasks, err := s.repo.GetList(filter)
+	if err != nil {
+		return nil, errors.Join(ErrGettingTasks, err)
+	}
+
+	if tasks == nil {
+		tasks = []*store.Task{}
+	}
+
+	return tasks, nil
 }

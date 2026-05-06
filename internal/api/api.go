@@ -15,10 +15,6 @@ import (
 	"github.com/o1uch/go_final_project/internal/store"
 )
 
-const (
-	defaultTaskLimit = 30
-)
-
 type API struct {
 	service   *service.Service
 	authToken string
@@ -145,48 +141,9 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filter := store.TaskFilter{}
 	searchPattern := r.URL.Query().Get("search")
-	if searchPattern != "" {
-		filter.Value = searchPattern
-		date, err := time.Parse("02.01.2006", searchPattern)
 
-		if err != nil {
-			filter.Type = store.FilterByText
-			Resp, err := api.store.GetList(filter)
-
-			if err != nil {
-				writeJSON(w, map[string]string{
-					"error": err.Error(),
-				}, http.StatusInternalServerError)
-				return
-			}
-
-			writeJSON(w, TasksResp{Tasks: Resp}, http.StatusOK)
-			return
-		}
-
-		filter.Type = store.FilterByDate
-		strDate := date.Format(repeat.DateLayout)
-		filter.Value = strDate
-		Resp, err := api.store.GetList(filter)
-
-		if err != nil {
-			writeJSON(w, map[string]string{
-				"error": err.Error(),
-			}, http.StatusInternalServerError)
-			return
-		}
-
-		writeJSON(w, TasksResp{Tasks: Resp}, http.StatusOK)
-		return
-
-	}
-
-	filter.Type = store.FilterByLimit
-	strLimit := strconv.Itoa(defaultTaskLimit)
-	filter.Value = strLimit
-	Resp, err := api.store.GetList(filter)
+	TaskList, err := api.service.GetTasks(searchPattern)
 
 	if err != nil {
 		writeJSON(w, map[string]string{
@@ -195,11 +152,7 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if Resp == nil {
-		Resp = []*store.Task{}
-	}
-
-	writeJSON(w, TasksResp{Tasks: Resp}, http.StatusOK)
+	writeJSON(w, TasksResp{Tasks: TaskList}, http.StatusOK)
 
 }
 
