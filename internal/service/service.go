@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
 	"strconv"
 	"strings"
@@ -15,13 +16,17 @@ const (
 )
 
 var (
-	ErrEmptyTitle   = errors.New("title is required")
-	ErrDateParse    = errors.New("error parsing a string into a date")
-	ErrEmptyDate    = errors.New("date is required")
-	ErrInvalidNow   = errors.New("invalid now format")
-	ErrNextDate     = errors.New("error calculating the nextDate function")
-	ErrCreateTask   = errors.New("task creation error")
-	ErrGettingTasks = errors.New("error getting task list")
+	ErrEmptyTitle      = errors.New("title is required")
+	ErrDateParse       = errors.New("error parsing a string into a date")
+	ErrEmptyDate       = errors.New("date is required")
+	ErrInvalidNow      = errors.New("invalid now format")
+	ErrNextDate        = errors.New("error calculating the nextDate function")
+	ErrCreateTask      = errors.New("task creation error")
+	ErrGettingTaskList = errors.New("error getting task list")
+	ErrEmptyID         = errors.New("ID is required")
+	ErrInvalidID       = errors.New("invalid ID format")
+	ErrTaskNotFound    = errors.New("task not found")
+	ErrGettingTask     = errors.New("error getting task")
 )
 
 type Service struct {
@@ -130,7 +135,7 @@ func (s *Service) GetTasks(searchPattern string) ([]*store.Task, error) {
 
 	tasks, err := s.repo.GetList(filter)
 	if err != nil {
-		return nil, errors.Join(ErrGettingTasks, err)
+		return nil, errors.Join(ErrGettingTaskList, err)
 	}
 
 	if tasks == nil {
@@ -138,4 +143,28 @@ func (s *Service) GetTasks(searchPattern string) ([]*store.Task, error) {
 	}
 
 	return tasks, nil
+}
+
+func (s *Service) GetTaskByID(idStr string) (*store.Task, error) {
+
+	if idStr == "" {
+		return nil, ErrEmptyID
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return nil, ErrInvalidID
+	}
+
+	task, err := s.repo.GetByID(id)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+
+		return nil, errors.Join(ErrGettingTask, err)
+	}
+
+	return task, nil
 }

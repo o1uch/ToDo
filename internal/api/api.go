@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -113,8 +112,10 @@ func (api *API) addTaskHandler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, service.ErrEmptyTitle):
 			status = http.StatusBadRequest
+
 		case errors.Is(err, service.ErrDateParse):
 			status = http.StatusBadRequest
+
 		case errors.Is(err, service.ErrNextDate):
 			status = http.StatusBadRequest
 		}
@@ -160,37 +161,25 @@ func (api *API) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.URL.Query().Get("id")
 
-	if idStr == "" {
-		writeJSON(w, map[string]string{
-			"error": "the \"id\" field is empty",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeJSON(w, map[string]string{
-			"error": "invalid ID",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	task, err := api.store.GetByID(id)
+	task, err := api.service.GetTaskByID(idStr)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			writeJSON(w, map[string]string{
-				"error": "task not found",
-			}, http.StatusNotFound)
-			return
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, service.ErrTaskNotFound):
+			status = http.StatusNotFound
 
-		} else {
-			writeJSON(w, map[string]string{
-				"error": err.Error(),
-			}, http.StatusInternalServerError)
-			return
+		case errors.Is(err, service.ErrInvalidID),
+			errors.Is(err, service.ErrEmptyID):
+			status = http.StatusBadRequest
 		}
+
+		writeJSON(w, map[string]string{
+			"error": err.Error(),
+		}, status)
+		return
 	}
+
 	writeJSON(w, task, http.StatusOK)
 }
 
