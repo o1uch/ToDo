@@ -27,6 +27,7 @@ var (
 	ErrInvalidID       = errors.New("invalid ID format")
 	ErrTaskNotFound    = errors.New("task not found")
 	ErrGettingTask     = errors.New("error getting task")
+	ErrUpdateTask      = errors.New("error update task")
 )
 
 type Service struct {
@@ -167,4 +168,55 @@ func (s *Service) GetTaskByID(idStr string) (*store.Task, error) {
 	}
 
 	return task, nil
+}
+
+func (s *Service) ChangeTaskByID(task *store.Task) error {
+
+	trimExtraSpaces(task)
+
+	if task.ID == 0 {
+		return ErrEmptyID
+	}
+
+	if task.Title == "" {
+		return ErrEmptyTitle
+	}
+
+	t := time.Now()
+	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	nowStr := now.Format(repeat.DateLayout)
+
+	if task.Date == "" {
+		task.Date = nowStr
+	}
+
+	date, err := time.Parse(repeat.DateLayout, task.Date)
+
+	if err != nil {
+		return errors.Join(ErrDateParse, err)
+	}
+
+	if date.Before(now) {
+
+		if task.Repeat == "" {
+			task.Date = nowStr
+		} else {
+			nextDate, err := repeat.NextDate(now, task.Date, task.Repeat)
+
+			if err != nil {
+				return errors.Join(ErrNextDate, err)
+			}
+			task.Date = nextDate
+		}
+
+	}
+
+	err = s.repo.Update(task)
+
+	if err != nil {
+		return errors.Join(ErrUpdateTask, err)
+	}
+
+	return nil
+
 }

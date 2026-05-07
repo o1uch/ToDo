@@ -39,9 +39,9 @@ func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		api.addTaskHandler(w, r)
 	case http.MethodGet:
-		api.GetTaskByID(w, r)
+		api.GetTaskByIDHandler(w, r)
 	case http.MethodPut:
-		api.ChangeTaskByID(w, r)
+		api.UpdateTaskHandler(w, r)
 	case http.MethodDelete:
 		api.DeleteTaskByID(w, r)
 	default:
@@ -157,7 +157,7 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (api *API) GetTaskByID(w http.ResponseWriter, r *http.Request) {
+func (api *API) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.URL.Query().Get("id")
 
@@ -183,9 +183,9 @@ func (api *API) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, task, http.StatusOK)
 }
 
-func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
+func (api *API) UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 
-	changeTask := store.Task{}
+	changedTask := &store.Task{}
 
 	body, err := io.ReadAll(r.Body)
 
@@ -196,7 +196,7 @@ func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = json.Unmarshal(body, &changeTask)
+	err = json.Unmarshal(body, changedTask)
 
 	if err != nil {
 		writeJSON(w, map[string]string{
@@ -205,68 +205,23 @@ func (api *API) ChangeTaskByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trimExtraSpaces(&changeTask)
-
-	if changeTask.ID == 0 {
-		writeJSON(w, map[string]string{
-			"error": "the \"id\" field is empty",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	if changeTask.Title == "" {
-		writeJSON(w, map[string]string{
-			"error": "the \"title\" field is empty",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	t := time.Now()
-	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-	nowStr := now.Format("20060102")
-
-	if changeTask.Date == "" {
-		changeTask.Date = nowStr
-	}
-
-	date, err := time.Parse("20060102", changeTask.Date)
+	err = api.service.ChangeTaskByID(changedTask)
 
 	if err != nil {
-		writeJSON(w, map[string]string{
-			"error": err.Error(),
-		}, http.StatusBadRequest)
-		return
-	}
+		status := http.StatusBadRequest
 
-	if date.Before(now) {
-
-		if changeTask.Repeat == "" {
-			changeTask.Date = nowStr
-		} else {
-			nextDate, err := repeat.NextDate(now, changeTask.Date, changeTask.Repeat)
-
-			if err != nil {
-				writeJSON(w, map[string]string{
-					"error": err.Error(),
-				}, http.StatusBadRequest)
-				return
-			}
-			changeTask.Date = nextDate
+		switch {
+		case errors.Is(err, service.ErrUpdateTask):
+			status = http.StatusInternalServerError
 		}
 
-	}
-
-	err = api.store.Update(&changeTask)
-
-	if err != nil {
 		writeJSON(w, map[string]string{
 			"error": err.Error(),
-		}, http.StatusNotFound)
+		}, status)
 		return
 	}
 
 	writeJSON(w, map[string]any{}, http.StatusOK)
-
 }
 
 func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
