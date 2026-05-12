@@ -115,7 +115,7 @@ func (s *Service) AddTask(task *store.Task) (int64, error) {
 	return id, nil
 }
 
-func (s *Service) GetTasks(searchPattern string) ([]*store.Task, error) {
+func (s *Service) GetList(searchPattern string) ([]*store.Task, error) {
 
 	filter := store.TaskFilter{}
 
@@ -147,7 +147,7 @@ func (s *Service) GetTasks(searchPattern string) ([]*store.Task, error) {
 	return tasks, nil
 }
 
-func (s *Service) GetTaskByID(idStr string) (*store.Task, error) {
+func (s *Service) GetTask(idStr string) (*store.Task, error) {
 
 	if idStr == "" {
 		return nil, ErrEmptyID
@@ -246,7 +246,12 @@ func (s *Service) DoneTask(idStr string) error {
 		err := s.repo.Delete(task.ID)
 
 		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				return ErrTaskNotFound
+			}
+
 			return errors.Join(ErrDeleteTask, err)
+
 		}
 
 		return nil
@@ -269,4 +274,30 @@ func (s *Service) DoneTask(idStr string) error {
 	}
 
 	return nil
+}
+
+func (s *Service) DeleteTask(idStr string) error {
+
+	if idStr == "" {
+		return ErrEmptyID
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return errors.Join(ErrInvalidID, err)
+	}
+
+	err = s.repo.Delete(id)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return ErrTaskNotFound
+		}
+
+		return errors.Join(ErrDeleteTask, err)
+
+	}
+
+	return nil
+
 }

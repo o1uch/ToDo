@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/o1uch/go_final_project/internal/service"
 	"github.com/o1uch/go_final_project/internal/store"
@@ -37,7 +36,7 @@ func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		api.addTaskHandler(w, r)
 	case http.MethodGet:
-		api.GetTaskByIDHandler(w, r)
+		api.GetTaskHandler(w, r)
 	case http.MethodPut:
 		api.UpdateTaskHandler(w, r)
 	case http.MethodDelete:
@@ -142,7 +141,7 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	searchPattern := r.URL.Query().Get("search")
 
-	TaskList, err := api.service.GetTasks(searchPattern)
+	TaskList, err := api.service.GetList(searchPattern)
 
 	if err != nil {
 		writeJSON(w, map[string]string{
@@ -155,11 +154,11 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (api *API) GetTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
+func (api *API) GetTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.URL.Query().Get("id")
 
-	task, err := api.service.GetTaskByID(idStr)
+	task, err := api.service.GetTask(idStr)
 
 	if err != nil {
 		status := http.StatusInternalServerError
@@ -248,6 +247,8 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusNotFound
 		case errors.Is(err, service.ErrNextDate):
 			status = http.StatusBadRequest
+		case errors.Is(err, service.ErrTaskNotFound):
+			status = http.StatusNotFound
 		}
 
 		writeJSON(w, map[string]string{
@@ -272,27 +273,21 @@ func (api *API) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.URL.Query().Get("id")
 
-	if idStr == "" {
-		writeJSON(w, map[string]string{
-			"error": "Id is not set",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeJSON(w, map[string]string{
-			"error": "invalid ID",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	err = api.store.Delete(id)
+	err := api.service.DeleteTask(idStr)
 
 	if err != nil {
+		status := http.StatusBadRequest
+
+		switch {
+		case errors.Is(err, service.ErrTaskNotFound):
+			status = http.StatusNotFound
+		case errors.Is(err, service.ErrDeleteTask):
+			status = http.StatusInternalServerError
+		}
+
 		writeJSON(w, map[string]string{
 			"error": err.Error(),
-		}, http.StatusNotFound)
+		}, status)
 		return
 	}
 
