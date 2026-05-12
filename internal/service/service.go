@@ -28,6 +28,7 @@ var (
 	ErrTaskNotFound    = errors.New("task not found")
 	ErrGettingTask     = errors.New("error getting task")
 	ErrUpdateTask      = errors.New("error update task")
+	ErrDeleteTask      = errors.New("error delete task")
 )
 
 type Service struct {
@@ -154,7 +155,7 @@ func (s *Service) GetTaskByID(idStr string) (*store.Task, error) {
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return nil, ErrInvalidID
+		return nil, errors.Join(ErrInvalidID, err)
 	}
 
 	task, err := s.repo.GetByID(id)
@@ -170,7 +171,7 @@ func (s *Service) GetTaskByID(idStr string) (*store.Task, error) {
 	return task, nil
 }
 
-func (s *Service) ChangeTaskByID(task *store.Task) error {
+func (s *Service) UpdateTask(task *store.Task) error {
 
 	trimExtraSpaces(task)
 
@@ -218,5 +219,54 @@ func (s *Service) ChangeTaskByID(task *store.Task) error {
 	}
 
 	return nil
+}
 
+func (s *Service) DoneTask(idStr string) error {
+
+	if idStr == "" {
+		return ErrEmptyID
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+
+	if err != nil {
+		return errors.Join(ErrInvalidID, err)
+	}
+
+	task, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+
+		return errors.Join(ErrGettingTask, err)
+	}
+
+	if task.Repeat == "" {
+		err := s.repo.Delete(task.ID)
+
+		if err != nil {
+			return errors.Join(ErrDeleteTask, err)
+		}
+
+		return nil
+	}
+
+	t := time.Now()
+
+	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+
+	nextDate, err := repeat.NextDate(now, task.Date, task.Repeat)
+	if err != nil {
+		return errors.Join(ErrNextDate, err)
+	}
+	task.Date = nextDate
+
+	err = s.repo.Update(task)
+
+	if err != nil {
+		return errors.Join(ErrUpdateTask, err)
+	}
+
+	return nil
 }

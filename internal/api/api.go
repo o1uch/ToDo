@@ -7,9 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/o1uch/go_final_project/internal/repeat"
 	"github.com/o1uch/go_final_project/internal/service"
 	"github.com/o1uch/go_final_project/internal/store"
 )
@@ -205,7 +203,7 @@ func (api *API) UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = api.service.ChangeTaskByID(changedTask)
+	err = api.service.UpdateTask(changedTask)
 
 	if err != nil {
 		status := http.StatusBadRequest
@@ -236,65 +234,25 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.URL.Query().Get("id")
 
-	if idStr == "" {
-		writeJSON(w, map[string]string{
-			"error": "Id is not set",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		writeJSON(w, map[string]string{
-			"error": "invalid ID",
-		}, http.StatusBadRequest)
-		return
-	}
-
-	task, err := api.store.GetByID(id)
+	err := api.service.DoneTask(idStr)
 
 	if err != nil {
-		writeJSON(w, map[string]string{
-			"error": err.Error(),
-		}, http.StatusNotFound)
-		return
-	}
+		status := http.StatusInternalServerError
 
-	if task.Repeat == "" {
-		err := api.store.Delete(task.ID)
-
-		if err != nil {
-			writeJSON(w, map[string]string{
-				"error": err.Error(),
-			}, http.StatusInternalServerError)
-			return
+		switch {
+		case errors.Is(err, service.ErrEmptyID):
+			status = http.StatusBadRequest
+		case errors.Is(err, service.ErrInvalidID):
+			status = http.StatusBadRequest
+		case errors.Is(err, service.ErrTaskNotFound):
+			status = http.StatusNotFound
+		case errors.Is(err, service.ErrNextDate):
+			status = http.StatusBadRequest
 		}
 
-		writeJSON(w, map[string]any{}, http.StatusOK)
-		return
-	}
-
-	t := time.Now()
-
-	now := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-
-	nextDate, err := repeat.NextDate(now, task.Date, task.Repeat)
-
-	if err != nil {
 		writeJSON(w, map[string]string{
 			"error": err.Error(),
-		}, http.StatusBadRequest)
-		return
-	}
-
-	task.Date = nextDate
-
-	err = api.store.Update(task)
-
-	if err != nil {
-		writeJSON(w, map[string]string{
-			"error": err.Error(),
-		}, http.StatusInternalServerError)
+		}, status)
 		return
 	}
 
