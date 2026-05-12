@@ -21,10 +21,9 @@ func (api *API) initAuthToken() {
 func (api *API) SignInHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
 		writeJSON(w, map[string]string{
 			"error": "method not allowed",
-		})
+		}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -33,15 +32,14 @@ func (api *API) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
 		writeJSON(w, map[string]string{
 			"error": "invalid JSON",
-		})
+		}, http.StatusBadRequest)
 		return
 	}
 
 	if api.authToken == "" {
-		writeJSON(w, map[string]string{})
+		writeJSON(w, map[string]string{}, http.StatusOK)
 		return
 	}
 
@@ -49,12 +47,11 @@ func (api *API) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	inputToken := hex.EncodeToString(inputHash[:])
 
 	if inputToken != api.authToken {
-		w.WriteHeader(http.StatusUnauthorized)
-		writeJSON(w, map[string]string{"error": "incorrect password"})
+		writeJSON(w, map[string]string{"error": "incorrect password"}, http.StatusUnauthorized)
 		return
 	}
 
-	writeJSON(w, map[string]string{"token": api.authToken})
+	writeJSON(w, map[string]string{"token": api.authToken}, http.StatusOK)
 }
 
 func (api *API) auth(next http.HandlerFunc) http.HandlerFunc {

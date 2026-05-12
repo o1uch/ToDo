@@ -28,7 +28,7 @@ func TestTask(t *testing.T) {
 
 	body, err := requestJSON("api/task", nil, http.MethodGet)
 	assert.NoError(t, err)
-	var m map[string]string
+	var m map[string]any
 	err = json.Unmarshal(body, &m)
 	assert.NoError(t, err)
 
@@ -41,7 +41,7 @@ func TestTask(t *testing.T) {
 	err = json.Unmarshal(body, &m)
 	assert.NoError(t, err)
 
-	assert.Equal(t, todo, m["id"])
+	assert.Equal(t, todo, fmt.Sprint(m["id"]))
 	assert.Equal(t, task.date, m["date"])
 	assert.Equal(t, task.title, m["title"])
 	assert.Equal(t, task.comment, m["comment"])
@@ -67,7 +67,10 @@ func TestEditTask(t *testing.T) {
 	}
 
 	id := addTask(t, tsk)
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	assert.NoError(t, err)
 
+	// Проверка невалидных значений. Ожидаемый результат для каждой итерации - ошибка
 	tbl := []fulltask{
 		{"", task{"20240129", "Тест", "", ""}},
 		{"abc", task{"20240129", "Тест", "", ""}},
@@ -123,7 +126,7 @@ func TestEditTask(t *testing.T) {
 	}
 
 	updateTask(map[string]any{
-		"id":      id,
+		"id":      idInt,
 		"date":    now.Format(`20060102`),
 		"title":   "Заказать хинкали",
 		"comment": "в 18:00",
