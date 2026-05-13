@@ -8,7 +8,7 @@ import (
 	"github.com/o1uch/go_final_project/internal/config"
 	"github.com/o1uch/go_final_project/internal/db"
 	"github.com/o1uch/go_final_project/internal/service"
-	"github.com/o1uch/go_final_project/internal/store"
+	"github.com/o1uch/go_final_project/internal/store/sqlite"
 	_ "modernc.org/sqlite"
 )
 
@@ -24,7 +24,7 @@ func main() {
 	}
 	defer sqlDB.Close()
 
-	sStore := store.NewSchedulerStore(sqlDB)
+	sStore := sqlite.NewSchedulerStore(sqlDB)
 	svc := service.NewService(&sStore)
 
 	port, err := config.GetPort()

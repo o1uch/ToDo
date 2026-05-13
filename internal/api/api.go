@@ -40,7 +40,7 @@ func (api *API) MainTaskHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		api.UpdateTaskHandler(w, r)
 	case http.MethodDelete:
-		api.DeleteTaskByID(w, r)
+		api.DeleteTaskByIDHandler(w, r)
 	default:
 		writeJSON(w, map[string]string{
 			"error": "The post method should be used to create a task",
@@ -261,7 +261,7 @@ func (api *API) DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (api *API) DeleteTaskByID(w http.ResponseWriter, r *http.Request) {
+func (api *API) DeleteTaskByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodDelete {
 		err := fmt.Sprintf("method %s, is not allowed", r.Method)

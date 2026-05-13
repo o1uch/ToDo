@@ -1,37 +1,13 @@
-package store
+package sqlite
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
 
+	"github.com/o1uch/go_final_project/internal/store"
 	_ "modernc.org/sqlite"
 )
-
-// main type
-
-type Task struct {
-	ID      int64  `json:"id"`
-	Date    string `json:"date"`
-	Title   string `json:"title"`
-	Comment string `json:"comment"`
-	Repeat  string `json:"repeat"`
-}
-
-// реализация структуры для фильтра на store.List
-
-type FilterType int
-
-const (
-	FilterByText FilterType = iota
-	FilterByDate
-	FilterByLimit
-)
-
-type TaskFilter struct {
-	Value string
-	Type  FilterType
-}
 
 type SchedulerStore struct {
 	db *sql.DB
@@ -41,7 +17,7 @@ func NewSchedulerStore(db *sql.DB) SchedulerStore {
 	return SchedulerStore{db: db}
 }
 
-func (s *SchedulerStore) Create(task *Task) (int64, error) {
+func (s *SchedulerStore) Create(task *store.Task) (int64, error) {
 	var id int64
 
 	res, err := s.db.Exec(`INSERT INTO scheduler (date, title, comment, repeat) VALUES(:date,
@@ -65,14 +41,8 @@ func (s *SchedulerStore) Create(task *Task) (int64, error) {
 
 }
 
-/*
-Что требовалось:
-В api обрабатывается параметр search.
-Если там дата - сделать поиск задач на конкретную дату.
-Если там text - возвратить задачи, содержащие этот паттерн
-*/
-func (s *SchedulerStore) GetList(f TaskFilter) ([]*Task, error) {
-	tasks := make([]*Task, 0, 16)
+func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
+	tasks := make([]*store.Task, 0, 16)
 	var rows *sql.Rows
 	var err error
 
