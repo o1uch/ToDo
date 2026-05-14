@@ -47,7 +47,7 @@ func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
 	var err error
 
 	switch f.Type {
-	case FilterByDate:
+	case store.FilterByDate:
 		rows, err = s.db.Query(`
 		SELECT id, date, title, comment, repeat 
 		FROM scheduler 
@@ -58,7 +58,7 @@ func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
 			return nil, err
 		}
 
-	case FilterByText:
+	case store.FilterByText:
 		fullPattern := "%" + f.Value + "%"
 		rows, err = s.db.Query(`
 		SELECT id, date, title, comment, repeat 
@@ -70,7 +70,7 @@ func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
 			return nil, err
 		}
 
-	case FilterByLimit:
+	case store.FilterByLimit:
 		rows, err = s.db.Query(`
 		SELECT id, date, title, comment, repeat 
 		FROM scheduler 
@@ -87,7 +87,7 @@ func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
 
 	defer rows.Close()
 	for rows.Next() {
-		t := &Task{}
+		t := &store.Task{}
 		if err := rows.Scan(&t.ID,
 			&t.Date,
 			&t.Title,
@@ -107,8 +107,8 @@ func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
 	return tasks, nil
 }
 
-func (s *SchedulerStore) GetByID(id int64) (*Task, error) {
-	t := Task{}
+func (s *SchedulerStore) GetByID(id int64) (*store.Task, error) {
+	t := store.Task{}
 	row := s.db.QueryRow(`SELECT id, date, title, comment, repeat FROM scheduler WHERE id = :id;`, sql.Named("id", id))
 
 	if err := row.Scan(&t.ID, &t.Date, &t.Title, &t.Comment, &t.Repeat); err != nil {
@@ -118,7 +118,7 @@ func (s *SchedulerStore) GetByID(id int64) (*Task, error) {
 	return &t, nil
 }
 
-func (s *SchedulerStore) Update(task *Task) error {
+func (s *SchedulerStore) Update(task *store.Task) error {
 	res, err := s.db.Exec(`UPDATE scheduler 
 	SET date = :date,
 	title = :title,

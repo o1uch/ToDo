@@ -6,7 +6,6 @@ import (
 
 	"github.com/o1uch/go_final_project/internal/api"
 	"github.com/o1uch/go_final_project/internal/config"
-	"github.com/o1uch/go_final_project/internal/db"
 	"github.com/o1uch/go_final_project/internal/service"
 	"github.com/o1uch/go_final_project/internal/store/sqlite"
 	_ "modernc.org/sqlite"
@@ -18,7 +17,7 @@ func main() {
 		log.Fatalf("cannot get db path: %v", err)
 	}
 
-	sqlDB, err := db.Init(dbPath)
+	sqlDB, err := sqlite.Init(dbPath)
 	if err != nil {
 		log.Fatalf("db init failed: %v", err)
 	}
