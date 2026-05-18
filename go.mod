@@ -6,6 +6,7 @@ toolchain go1.24.12
 
 require (
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/lib/pq v1.12.3
 	github.com/stretchr/testify v1.11.1
 	modernc.org/sqlite v1.44.3
 )
