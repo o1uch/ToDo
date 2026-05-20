@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/o1uch/go_final_project/internal/store"
@@ -108,4 +109,49 @@ func (s *SchedulerStore) GetList(f store.TaskFilter) ([]*store.Task, error) {
 	}
 
 	return tasks, nil
+}
+
+func (s *SchedulerStore) GetByID(id int64) (*store.Task, error) {
+	t := store.Task{}
+	row := s.db.QueryRow(`
+	SELECT id, date, title, comment, repeat
+	FROM scheduler 
+	WHERE id = $1;`, id)
+
+	if err := row.Scan(&t.ID, &t.Date, &t.Title, &t.Comment, &t.Repeat); err != nil {
+		return nil, err
+	}
+
+	return &t, nil
+}
+
+func (s *SchedulerStore) Update(task *store.Task) error {
+	res, err := s.db.Exec(`UPDATE scheduler 
+	SET date = $1,
+	title = $2,
+	comment = $3,
+	repeat = $4 
+	WHERE id = $5;`,
+		task.Date,
+		task.Title,
+		task.Comment,
+		task.Repeat,
+		task.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf(`incorrect id for updating task`)
+	}
+	return nil
+
 }
