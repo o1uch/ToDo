@@ -155,3 +155,27 @@ func (s *SchedulerStore) Update(task *store.Task) error {
 	return nil
 
 }
+
+func (s *SchedulerStore) Delete(id int64) error {
+
+	res, err := s.db.Exec(`
+	DELETE FROM scheduler
+	WHERE id = $1
+	`, id)
+
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return fmt.Errorf("task with id = %v was not found", id)
+	}
+
+	return nil
+}
